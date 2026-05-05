@@ -4,10 +4,9 @@ import { useEffect, useState } from 'react'
 import './App.css'
 
 //Import da variavel DB que vem do firebase
-import { db, } from './firebase'
+import { initializeApp } from 'firebase/app'
+import { getFirestore } from 'firebase/firestore'
 import { collection, deleteDoc, doc, getDocs, addDoc } from 'firebase/firestore'
-import { notEqual } from 'firebase/firestore/pipelines'
-
 
 
 
@@ -23,52 +22,113 @@ export default function App() {
   //e adiciona-lo ao banco
   const [titulo, settitulo] = useState('')
   const [autor, setAutor] = useState('')
+  const [colecao, setColecao] = useState('')
+
+  //Abre o menu de configurações
+  const [modalOpen, setModalOpen] = useState(false)
+  
+  //useState pra guardar os dados do firebase
+  const [firebaseconfigs, setFirebaseconfigs] = useState('')
 
   // Função para pegar as informações do Firebase
   async function getLivros() {
-    const snapshot = await getDocs(collection(db, "livraria"))
-    const livros = snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data()
-    }))
-    setLivros(livros)
-    
-    //printa no console só para confirmação dos dados
-    //opcional
-    console.log(livros)
-  }
+
+  if(!firebaseconfigs.apiKey) return
+
+  const app = initializeApp(firebaseconfigs)
+
+  const db = getFirestore(app)
+
+  const snapshot = await getDocs(collection(db, colecao))
+
+  const livros = snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data()
+  }))
+
+  setLivros(livros)
+
+  console.log(livros)
+}
 
   
   //Funcao para excluir 1 livro do Firebase
   async function excluir(id){
 
-    await deleteDoc(doc(db, "livraria", id))
+  const app = initializeApp(firebaseconfigs)
 
-    //chama a função de pegar os dados denovo para recarregar a lista
-    getLivros()
-  }
+  const db = getFirestore(app)
+
+  await deleteDoc(doc(db, colecao, id))
+
+  getLivros()
+}
 
   //Funcao para adicionar o livro no banco
   async function adicionarLivro(){
 
-    if(titulo === '' && autor === ''){
-      alert('Preencha pelo menos 1 campo')
+  if(!firebaseconfigs.apiKey){
+    alert('Configure o Firebase primeiro')
+    return
+  }
+
+  if(titulo === '' && autor === '' || colecao === ''){
+    alert('Preencha os campos corretamente')
+    return
+  }
+
+  const app = initializeApp(firebaseconfigs)
+
+  const db = getFirestore(app)
+
+  await addDoc(collection(db, colecao), {
+    titulo,
+    autor
+  })
+
+  settitulo('')
+  setAutor('')
+
+  getLivros()
+}
+
+  function openModal(){
+    setModalOpen(!modalOpen)
+  }
+
+function extrairFirebaseConfig(texto){
+
+  try{
+
+    const regex = /const firebaseConfig = ({[\s\S]*?});/
+
+    const resultado = texto.match(regex)
+
+    if(!resultado){
+      alert('Config não encontrada')
       return
     }
 
-    //Adiciona os dados no Firebase
-    await addDoc(collection(db, "livraria"), {
-      titulo: titulo,
-      autor: autor
-    })
+    const objetoTexto = resultado[1]
 
-    //limpa os campos
-    settitulo('')
-    setAutor('')
+    // converte texto em objeto JS
+    const objeto = new Function(`return ${objetoTexto}`)()
 
-    //Atualiza a lista com o livro ja adicionado
-    getLivros()
+    setFirebaseconfigs(objeto)
+
+    console.log(objeto)
+
+    // alerta
+    alert('Firebase salvo com sucesso')
+
+    // fecha modal
+    setModalOpen(false)
+
+  }catch(err){
+    console.log(err)
+    alert('Erro ao extrair config')
   }
+}
 
 
 
@@ -78,20 +138,25 @@ export default function App() {
   // useEffect, roda toda vez que a pagina é carregada
   // para pegar os dados do Firebase
   useEffect(() => {
+
+  if(firebaseconfigs.apiKey){
     getLivros()
-  }, [])
+  }
+
+}, [firebaseconfigs])
 
 
 
 
 
-
+  //Render da pagina
   return(
     <div className='app flex-center'>
       <h1>Exemplo CRUD Firebase</h1>
       <h2>Livraria App-Libre</h2>
 
       <div className='addLivro flex-center'>
+        <input value={colecao} onChange={(e) => setColecao(e.target.value)} type='text' placeholder='Collection onde salvar' style={{fontWeight:"bold", fontSize:15, textAlign:'center'}}></input>
         <input value={titulo} onChange={(e) => settitulo(e.target.value)} type='text' placeholder='Titulo do Livro'></input>
         <input value={autor} onChange={(e) => setAutor(e.target.value)} type='text' placeholder='Nome do Autor'></input>
         <button className='botaoAdd' onClick={() => adicionarLivro()}>Adicionar Livro</button>      
@@ -112,6 +177,33 @@ export default function App() {
         }) : <p>Sem livros até o momento</p>
       }
 
+      <div onClick={() => openModal()} className='configOpen flex-center'>
+        <img style={{height:29, width:29}} src='https://cdn-icons-png.flaticon.com/128/8618/8618529.png'></img>
+      </div>
+
+      {/* tela para colar suas configurações do firebase */}
+      {
+        modalOpen &&
+        <div className='modal flex-center'>
+          <div className='content'>
+          <button style={{backgroundColor:"red"}} onClick={() => setModalOpen(false)}>fechar</button>
+            <textarea onChange={(e) => extrairFirebaseConfig(e.target.value)} className='firebaseconfigs' type="text" />
+          </div>
+        </div> 
+      }
+
+      {/* { exibe as config do firebase */}
+      {
+        firebaseconfigs &&
+        <div className='firebaseconfigs'>
+          <p>API Key: {firebaseconfigs.apiKey}</p>
+          <p>Auth Domain: {firebaseconfigs.authDomain}</p>
+          <p>Project ID: {firebaseconfigs.projectId}</p>
+          <p>Storage Bucket: {firebaseconfigs.storageBucket}</p>
+          <p>Messaging Sender ID: {firebaseconfigs.messagingSenderId}</p>
+          <p>App ID: {firebaseconfigs.appId}</p>
+        </div>
+      }
       
     </div>
     
