@@ -7,6 +7,7 @@ import './App.css'
 import { initializeApp } from 'firebase/app'
 import { getFirestore } from 'firebase/firestore'
 import { collection, deleteDoc, doc, getDocs, addDoc } from 'firebase/firestore'
+import CommandsModal from './CommandsModal'
 
 
 
@@ -26,6 +27,9 @@ export default function App() {
 
   //Abre o menu de configurações
   const [modalOpen, setModalOpen] = useState(false)
+  //Mostra o comando que vai ser executado
+  const [showCommand, setShowCommand] = useState(false)
+  const [modo, setModo] = useState("")
   
   //useState pra guardar os dados do firebase
   const [firebaseconfigs, setFirebaseconfigs] = useState('')
@@ -82,8 +86,8 @@ export default function App() {
   const db = getFirestore(app)
 
   await addDoc(collection(db, colecao), {
-    titulo,
-    autor
+    titulo: titulo,
+    autor: autor
   })
 
   settitulo('')
@@ -159,7 +163,8 @@ function extrairFirebaseConfig(texto){
         <input value={colecao} onChange={(e) => setColecao(e.target.value)} type='text' placeholder='Collection onde salvar' style={{fontWeight:"bold", fontSize:15, textAlign:'center'}}></input>
         <input value={titulo} onChange={(e) => settitulo(e.target.value)} type='text' placeholder='Titulo do Livro'></input>
         <input value={autor} onChange={(e) => setAutor(e.target.value)} type='text' placeholder='Nome do Autor'></input>
-        <button className='botaoAdd' onClick={() => adicionarLivro()}>Adicionar Livro</button>      
+        <button onMouseLeave={() => {setShowCommand(false)}} 
+        onMouseEnter={() => {setShowCommand(true); setModo("add")}} className='botaoAdd' onClick={() => adicionarLivro()}>Adicionar Livro</button>      
       </div>
 
       {/* verifica se os livros estao presentes (se a length for maior que 0)
@@ -171,7 +176,8 @@ function extrairFirebaseConfig(texto){
             <div key={livro.id} className='livroContainer flex-center'>
               <h2>Título: {livro.titulo}</h2>
               <p>Autor: {livro.autor}</p>
-              <button onClick={() => excluir(livro.id)} className='excluir'>X</button>
+              <button onMouseLeave={() => {setShowCommand(false)}} 
+              onMouseEnter={() => {setShowCommand(true); setModo("delete")}} onClick={() => excluir(livro.id)} className='excluir'>X</button>
             </div>
           )
         }) : <p>Sem livros até o momento</p>
@@ -192,7 +198,7 @@ function extrairFirebaseConfig(texto){
         </div> 
       }
 
-      {/* { exibe as config do firebase */}
+      {/* { exibe as config do firebase quando presentes */}
       {
         firebaseconfigs &&
         <div className='firebaseconfigs'>
@@ -204,7 +210,11 @@ function extrairFirebaseConfig(texto){
           <p>App ID: {firebaseconfigs.appId}</p>
         </div>
       }
-      
+
+      {/* Modal que mostra o comando q vai ser executado quando algum elemento tiver o mouse emcima */}
+      <CommandsModal modo={modo} visivel={showCommand} titulo={titulo} autor={autor} colecao={colecao}/>
+
+
     </div>
     
   )
